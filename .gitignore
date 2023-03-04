@@ -1,0 +1,6 @@
+.cropped/
+*.aux
+*.log
+*.pdf
+*.tex
+/.flip/
