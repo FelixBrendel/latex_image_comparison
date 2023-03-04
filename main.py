@@ -438,7 +438,13 @@ def make_latex_standalone(file_name, content, compile=True):
 
     if compile:
         print("compiling:")
-        res = os.system("pdflatex " + file_name)
+
+        parent_dir = str(Path(file_name).parent)
+
+        res = os.system(" ".join(("pdflatex",
+                                  "-aux-directory="+parent_dir,
+                                  "-output-directory="+parent_dir,
+                                  file_name)))
         if res == 0:
             print("success! :)")
         else:
