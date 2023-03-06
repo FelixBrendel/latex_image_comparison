@@ -31,6 +31,10 @@ from PIL import Image
 import sys
 import os
 
+from math import log10, floor
+def round_sig(x, sig=3):
+    return round(x, sig-int(floor(log10(abs(x))))-1)
+
 def lst_or_tpl(obj):
     return type(obj) is list or type(obj) is tuple
 
@@ -60,7 +64,17 @@ def get_similarity_values(ref, img):
     psnr       = skimage.metrics.peak_signal_noise_ratio(sk_ref, sk_img)
     ssim       = skimage.metrics.structural_similarity(sk_ref, sk_img, channel_axis=2)
 
-    return mse, psnr, ssim
+    return {"MSE": mse, "PSNR": psnr, "SSIM": ssim}
+
+def read_flip_stats(file_path):
+    stats = {}
+    with open(file_path, "r") as in_file:
+        lines = in_file.readlines()
+        for line in lines:
+            left, right = line.split(":")
+            stats["Flip "+left.strip()] = float(right.strip())
+
+    return stats
 
 flipped_images = 0
 def create_flip_image(ref, img):
@@ -70,18 +84,25 @@ def create_flip_image(ref, img):
     base_path = ".flip/"
     Path(base_path).mkdir(parents=True, exist_ok=True)
 
-    flip_exe = str(Path("./flip/python/flip.py").resolve())
+    flip_exe = str((Path(__file__).parent/Path("./flip/python/flip.py")).resolve())
     run_cmd = " ".join(["python ", flip_exe,
                         "-r", ref,
                         "-t", img,
                         "-d", str(Path(base_path).resolve()),
-                        "-b", str(flipped_images)])
+                        "-b", str(flipped_images),
+                        "-txt"])
     print()
     print("Flip nr", flipped_images)
     print(run_cmd, flush=True)
     os.system(run_cmd)
 
-    return str(Path(base_path + str(flipped_images)+".png").resolve())
+    flip_path = str(Path(base_path + str(flipped_images)+".png").resolve())
+    return flip_path
+
+def create_flip_image_and_stats(ref, img):
+    out_png_file = create_flip_image(ref, img)
+    stats        = read_flip_stats(out_png_file[:-3]+"txt")
+    return out_png_file, stats
 
 cropped_image_counter = 0
 def create_cropped_image(path, trim):
@@ -121,7 +142,7 @@ def make_bordered_square(path, box_px, color, out_list):
     make_image(path, out_list, width=1, trim=box_px)
     out_list.extend((r"""};
                 \draw[""",color,r""",ultra thick] (0,0) rectangle (\linewidth, \linewidth);
-            \end{tikzpicture} \vspace{0.01\textwidth}"""))
+            \end{tikzpicture}"""))
 
 def calc_box_dim(box, aspect):
     box_dim = [0,0,0,0]
@@ -275,7 +296,7 @@ def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list)
       \end{center}
       \vspace*{-1cm}""")
 
-def do_columns(paths, metrics, headers, box1, box2, margin, out_list):
+def do_columns(paths, metrics, headers, box1, box2, margin, out_list, max_width):
     r = Image.open(paths[0][0])
     res = r.size
     aspect = res[0] / res[1]
@@ -287,67 +308,79 @@ def do_columns(paths, metrics, headers, box1, box2, margin, out_list):
     print(box1, box2)
     print(box_1_width, box_2_width)
 
-    minipage_width = (1 - (len(paths)*2*margin)) / len(paths)
+    minipage_width = (max_width - (len(paths)*2*margin)) / len(paths)
 
     out_list.extend((r"""\begin{center}
         \bgroup
         \def\arraystretch{0.9}
         {\setlength{\tabcolsep}{""", margin, r"""\textwidth}
-        \begin{tabular}{""", "c"*(len(paths)),"""}
+        \begin{tabular}{r""", "c"*(len(paths)),"""l}
     """))
-    out_list.extend(("      ", " & ".join(headers), r"\\"))
+    out_list.extend(("     & ", " & ".join(headers), r"\\"))
 
     first_iter = True
 
-    best_mse  = metrics[0][0]
-    best_psnr = metrics[0][1]
-    best_ssim = metrics[0][2]
+    best_mse   = metrics[0]["MSE"]
+    best_psnr  = metrics[0]["PSNR"]
+    best_ssim  = metrics[0]["SSIM"]
+    best_fmean = metrics[0]["Flip Mean"]
     for m in metrics:
-        if m[0] < best_mse:
-            best_mse = m[0]
-        if m[1] > best_psnr:
-            best_psnr = m[1]
-        if m[2] > best_ssim:
-            best_ssim = m[2]
+        if m["MSE"] < best_mse:
+            best_mse = m["MSE"]
+        if m["PSNR"] > best_psnr:
+            best_psnr = m["PSNR"]
+        if m["SSIM"] > best_ssim:
+            best_ssim = m["SSIM"]
+        if m["Flip Mean"] < best_fmean:
+            best_fmean = m["Flip Mean"]
 
     for idx, path_pack in enumerate(paths):
-        if not first_iter:
-            out_list.append("&")
-        first_iter = False
 
         out_list.extend((r"""
-        \begin{minipage}{""",minipage_width,r"""\textwidth}"""))
+        &\begin{minipage}{""",minipage_width,r"""\textwidth}"""))
 
         make_bordered_square(path_pack[0], box_1_width, "orange",out_list)
         make_bordered_square(path_pack[1], box_1_width, "orange",out_list)
         make_bordered_square(path_pack[0], box_2_width, "blue",out_list)
         make_bordered_square(path_pack[1], box_2_width, "blue",out_list)
 
-        def maybe_make_blue(val, cond):
-            val = round(val, 2)
-            if cond:
+        out_list.append(r""" \end{minipage}""")
+
+    out_list.append(r"\vspace{2mm}\\")
+    out_list.append(r"""
+          \begin{tabular}{ r }
+              MSE\\
+              PSNR\\
+              SSIM\\
+              FMean\\
+         \end{tabular}""")
+
+    for idx, path_pack in enumerate(paths):
+        def maybe_make_blue(val, best):
+            val  = round_sig(val,  3)
+            best = round_sig(best, 3)
+            if val == best:
                 return r"\textcolor{blue}{"+str(val)+"}"
             return val
 
-        if metrics:
-            m = metrics[idx]
-            out_list.extend((r"""
-         \vspace{0.1cm}
-         \begin{tabular}{ l l }
-          MSE  &  """, maybe_make_blue(m[0], m[0] == best_mse),  r"""\\
-          PSNR &  """, maybe_make_blue(m[1], m[1] == best_psnr), r"""\\
-          SSIM &  """, maybe_make_blue(m[2], m[2] == best_ssim), r"""
-         \end{tabular}\vspace{0.9cm}"""))
-        else:
-            out_list.extend((r""" \vspace{""", 2*margin, r"""\textwidth}"""))
 
-        out_list.append(r""" \end{minipage}""")
+        m = metrics[idx]
+        out_list.extend((r"""
+        &
+        \multicolumn{1}{r}{
+         \begin{tabular}{ r }
+          """, maybe_make_blue(m["MSE"],  best_mse),        r"""\\
+          """, maybe_make_blue(m["PSNR"], best_psnr),       r"""\\
+          """, maybe_make_blue(m["SSIM"], best_ssim),       r"""\\
+          """, maybe_make_blue(m["Flip Mean"], best_fmean), r"""\\
+         \end{tabular}}"""))
 
-    out_list.append(r"""
+
+    out_list.append(r""" & \phantom{FMean}
         \end{tabular}}
         \egroup
       \end{center}
-      \vspace*{-1cm}""")
+      """)
 
 
 ## ----------------------
@@ -380,11 +413,25 @@ def vertical_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, 
             raise Exception("Each comparison image needs to have 2 components: " +
                             "name, path")
 
-    paths   = [(p[1], create_flip_image(ref[1], p[1])) for p in images]
-    metrics = [get_similarity_values(ref[1], p[1]) for p in images]
-    headers = [p[0] if lst_or_tpl(p) else "" for p in images]
+    paths        = []
+    metrics      = []
+    headers      = []
+    for p in images:
+        flip_img, flip_stats = create_flip_image_and_stats(ref[1], p[1])
+        paths.append((p[1], flip_img))
+        flip_stats.update(get_similarity_values(ref[1], p[1]))
+        metrics.append(flip_stats)
+        headers.append(p[0] if lst_or_tpl(p) else "")
+
+    max_width = 1
+    if len(images) == 4:
+        max_width = 0.75
+    if len(images) == 5:
+        max_width = 0.8
+
     do_columns(paths=paths, metrics=metrics, headers=headers,
-               box1=box1, box2=box2, margin=margin, out_list=out_list)
+               box1=box1, box2=box2, margin=margin, out_list=out_list,
+               max_width=max_width)
 
 
 def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
