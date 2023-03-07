@@ -33,6 +33,8 @@ import os
 
 from math import log10, floor
 def round_sig(x, sig=3):
+    if x == 0:
+        return 0
     return round(x, sig-int(floor(log10(abs(x))))-1)
 
 def lst_or_tpl(obj):
@@ -353,6 +355,11 @@ def do_columns(paths, metrics, headers, box1, box2, margin, out_list, max_width)
               PSNR\\
               SSIM\\
               FMean\\
+              FWMean\\
+              F1WQ\\
+              F3WQ\\
+              FMIN\\
+              FMAX\\
          \end{tabular}""")
 
     for idx, path_pack in enumerate(paths):
@@ -373,6 +380,11 @@ def do_columns(paths, metrics, headers, box1, box2, margin, out_list, max_width)
           """, maybe_make_blue(m["PSNR"], best_psnr),       r"""\\
           """, maybe_make_blue(m["SSIM"], best_ssim),       r"""\\
           """, maybe_make_blue(m["Flip Mean"], best_fmean), r"""\\
+          """, round_sig(m["Flip Weighted median"]),       r"""\\
+          """, round_sig(m["Flip 1st weighted quartile"]), r"""\\
+          """, round_sig(m["Flip 3rd weighted quartile"]), r"""\\
+          """, round_sig(m["Flip Min"]), r"""\\
+          """, round_sig(m["Flip Max"]), r"""\\
          \end{tabular}}"""))
 
 
@@ -398,7 +410,7 @@ def one_line_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margi
 
 
 def vertical_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
-                         cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", show_grid=False):
+                         cmps=tuple(), show_grid=False):
     ref_img = [ref]
     paths   = [p[1] if lst_or_tpl(p) else p for p in ref_img]
     headers = [p[0] if lst_or_tpl(p) else "" for p in ref_img]
@@ -406,7 +418,7 @@ def vertical_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, 
                 box1=box1, box2=box2, ref_width=ref_width,
                 margin=margin, show_grid=show_grid, ref_crop=ref_crop, out_list=out_list)
 
-    images  = [i for i in (cmp1, cmp2, cmp3, cmp4, cmp5) if i != ""]
+    images  = [i for i in cmps if i != ""]
 
     for i in images:
         if len(i) != 2:
@@ -423,11 +435,8 @@ def vertical_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, 
         metrics.append(flip_stats)
         headers.append(p[0] if lst_or_tpl(p) else "")
 
-    max_width = 1
-    if len(images) == 4:
-        max_width = 0.75
-    if len(images) == 5:
-        max_width = 0.8
+
+    max_width = 0.8
 
     do_columns(paths=paths, metrics=metrics, headers=headers,
                box1=box1, box2=box2, margin=margin, out_list=out_list,
