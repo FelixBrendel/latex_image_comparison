@@ -480,6 +480,7 @@ def make_latex_standalone(file_name, content, compile=True):
 \usepackage{tikz}
 \usepackage{adjustbox}
 \usetikzlibrary{calc}
+\usepackage[sc]{mathpazo}
 
 \begin{document}"""]
 
