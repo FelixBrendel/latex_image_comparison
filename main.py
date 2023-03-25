@@ -443,6 +443,80 @@ def vertical_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, 
                max_width=max_width)
 
 
+
+def single_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
+                         cmp=tuple(), show_grid=False, max_col_width=0.8):
+    ref_img = [ref]
+    paths   = [p[1] if lst_or_tpl(p) else p for p in ref_img]
+    headers = [p[0] if lst_or_tpl(p) else "" for p in ref_img]
+    do_one_line(images=ref_img, paths=paths, headers=headers,
+                box1=box1, box2=box2, ref_width=ref_width,
+                margin=margin, show_grid=show_grid, ref_crop=ref_crop, out_list=out_list)
+
+    if len(cmp) != 2:
+        raise Exception("Each comparison image needs to have 2 components: " +
+                        "name, path")
+
+    metrics      = []
+    headers      = []
+
+    flip_img, flip_stats = create_flip_image_and_stats(ref[1], cmp[1])
+    paths        = [(cmp[1], flip_img)]
+    flip_stats.update(get_similarity_values(ref[1], cmp[1]))
+    metrics.append(flip_stats)
+    headers.append(cmp[0] if lst_or_tpl(cmp) else "")
+
+    r = Image.open(paths[0][0])
+    res = r.size
+    aspect = res[0] / res[1]
+
+    box_1_width = calc_box_dim(box1, aspect)
+    box_2_width = calc_box_dim(box2, aspect)
+
+    print("..................................")
+    print(box1, box2)
+    print(box_1_width, box_2_width)
+
+    minipage_width = (max_col_width - (len(paths)*4*margin)) / (len(paths)*2)
+
+    out_list.extend((r"""\begin{center}
+        \bgroup
+        \def\arraystretch{0.9}
+        {\setlength{\tabcolsep}{""", margin, r"""\textwidth}
+        \begin{tabular}{""", "c"*(len(paths)*2),"""}
+    """))
+    out_list.extend((r"     \multicolumn{2}{c}{",headers[0], r"}\\"))
+
+    first_iter = True
+
+    for i in range(2):
+        if i==1:
+            out_list.append("&")
+
+        out_list.extend((r"""
+        \begin{minipage}{""",minipage_width,r"""\textwidth}"""))
+
+        if i == 0:
+            make_bordered_square(paths[0][0], box_1_width, "orange",out_list)
+            make_bordered_square(paths[0][1], box_1_width, "orange",out_list)
+        else:
+            make_bordered_square(paths[0][0], box_2_width, "blue",out_list)
+            make_bordered_square(paths[0][1], box_2_width, "blue",out_list)
+
+        out_list.append(r""" \end{minipage}""")
+
+    out_list.append(r"\vspace{2mm}\\")
+    print("metrixs:", metrics)
+
+    out_list.append(r"""
+        \end{tabular}}
+        \egroup
+      \end{center}
+      """)
+
+
+
+
 def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
                                  cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", show_grid=False):
     ref_img = [ref]
