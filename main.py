@@ -250,7 +250,7 @@ def do_one_line(images, paths, headers, box1, box2, ref_width, margin, show_grid
       \vspace*{-1cm}""")
 
 
-def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list):
+def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list, iter_names, iter_title):
     #images [("name", paths...), ...]
     rows = images
 
@@ -261,7 +261,7 @@ def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list)
     box_1_width = calc_box_dim(box1, aspect)
     box_2_width = calc_box_dim(box2, aspect)
 
-    num_columns = (len(flips[0])*2)
+    num_columns = (len(flips[0]))
 
     minipage_width = (0.9 - (num_columns*margin)) / (num_columns)
 
@@ -269,23 +269,38 @@ def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list)
         \bgroup
         \def\arraystretch{0.9}
         {\setlength{\tabcolsep}{""", margin, r"""\textwidth}
-        \begin{tabular}{""", "c"*(num_columns+1),"""}
+        \begin{tabular}{""", "c"*(num_columns),"""}
     """))
 
-    for i in range(0, num_columns//2):
-        out_list.extend((r"& \multicolumn{2}{c}{iter ", i+1, r"} "))
+    if iter_title:
+        out_list.extend((r"\multicolumn{", num_columns, "}{c}{", str(iter_title), r"}\\"))
+        
+    if iter_names is None:
+        for i in range(0, num_columns):
+            out_list.extend((r" & iter ", i+1))
+    else:
+        out_list.extend((" & ". join(iter_names)))
+
     out_list.append(r"\\")
 
+
     for row_idx, row in enumerate(images):
-        out_list.extend((r"\rotatebox[origin=c]{90}{", row[0] ,r"}"))
-        squares = flatten(zip(row[1:], flips[row_idx]))
+        #out_list.extend((r"\rotatebox[origin=c]{90}{", row[0] ,r"}"))
+        squares = list(flatten(zip(row[1:], flips[row_idx])))
         print("suqares: ", list(flatten(zip(row[1:], flips))), flush=True)
-        for square in squares:
-            out_list.extend((r"""&
+        for square_idx, square in enumerate(squares):
+            if square_idx % 2 != 0:
+                continue
+            if square_idx != 0:
+                out_list.append("& ")
+
+            out_list.extend((r"""
         \begin{minipage}{""",minipage_width,r"""\textwidth}"""))
 
-            make_bordered_square(square, box_1_width, "orange", out_list)
-            make_bordered_square(square, box_2_width, "blue", out_list)
+            make_bordered_square(squares[square_idx],   box_1_width, "orange", out_list)
+            make_bordered_square(squares[square_idx+1], box_1_width, "orange", out_list)
+            make_bordered_square(squares[square_idx],   box_2_width, "blue", out_list)
+            make_bordered_square(squares[square_idx+1], box_2_width, "blue", out_list)
 
 
             out_list.append(r""" \end{minipage}""")
@@ -518,7 +533,7 @@ def single_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, ma
 
 
 def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
-                                 cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", show_grid=False):
+                                 cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", iter_names=None, iter_title="", show_grid=False):
     ref_img = [ref]
     paths   = [p[1] if lst_or_tpl(p) else p for p in ref_img]
     headers = [p[0] if lst_or_tpl(p) else "" for p in ref_img]
@@ -545,7 +560,7 @@ def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_wi
         if len(i)-1 != num_images:
             raise Exception("All comparisons need to have the same number of images")
 
-    do_horizontal_iteration_columns(images=images, flips=flips, box1=box1, box2=box2, margin=margin, out_list=out_list)
+    do_horizontal_iteration_columns(images=images, flips=flips, box1=box1, box2=box2, margin=margin, out_list=out_list, iter_names=iter_names, iter_title=iter_title)
 
 
 
