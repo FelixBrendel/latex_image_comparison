@@ -250,7 +250,7 @@ def do_one_line(images, paths, headers, box1, box2, ref_width, margin, show_grid
       \vspace*{-1cm}""")
 
 
-def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list, iter_names, iter_title):
+def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list, iter_names, iter_title, columns_total_width):
     #images [("name", paths...), ...]
     rows = images
 
@@ -263,7 +263,7 @@ def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list,
 
     num_columns = (len(flips[0]))
 
-    minipage_width = (0.9 - (num_columns*margin)) / (num_columns)
+    minipage_width = (columns_total_width - (num_columns*margin)) / (num_columns)
 
     out_list.extend((r"""\begin{center}
         \bgroup
@@ -274,7 +274,7 @@ def do_horizontal_iteration_columns(images, flips, box1, box2, margin, out_list,
 
     if iter_title:
         out_list.extend((r"\multicolumn{", num_columns, "}{c}{", str(iter_title), r"}\\"))
-        
+
     if iter_names is None:
         for i in range(0, num_columns):
             out_list.extend((r" & iter ", i+1))
@@ -533,7 +533,8 @@ def single_flip_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, ma
 
 
 def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_width=-1, margin=0.005, box1=(0, 0, 1), box2=(1, 1, 1),
-                                 cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", iter_names=None, iter_title="", show_grid=False):
+                                 cmp1="", cmp2="", cmp3="", cmp4="", cmp5="", iter_names=None, iter_title="", show_grid=False,
+                                 columns_total_width=0.9,print_stats=False):
     ref_img = [ref]
     paths   = [p[1] if lst_or_tpl(p) else p for p in ref_img]
     headers = [p[0] if lst_or_tpl(p) else "" for p in ref_img]
@@ -545,12 +546,19 @@ def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_wi
     if len(images) == 0:
         raise Exception("No comparison images supplied")
 
+    stats = []
     flips = []
     for img in images:
         l = []
 
         for iter in img[1:]:
-            l.append(create_flip_image(ref[1], iter))
+            if print_stats:
+                png_file, flip_stats = create_flip_image_and_stats(ref[1], iter)
+                stats.append(flip_stats)
+                stats[-1].update(get_similarity_values(ref[1], iter))
+            else:
+                png_file = create_flip_image(ref[1], iter)
+            l.append(png_file)
 
         flips.append(l)
 
@@ -560,7 +568,9 @@ def horizontal_iterations_figure(out_list, ref="", ref_crop=(0, 0, 0, 0), ref_wi
         if len(i)-1 != num_images:
             raise Exception("All comparisons need to have the same number of images")
 
-    do_horizontal_iteration_columns(images=images, flips=flips, box1=box1, box2=box2, margin=margin, out_list=out_list, iter_names=iter_names, iter_title=iter_title)
+    do_horizontal_iteration_columns(images=images, flips=flips, box1=box1, box2=box2, margin=margin, out_list=out_list, iter_names=iter_names, iter_title=iter_title, columns_total_width=columns_total_width)
+    if print_stats:
+        print(stats)
 
 
 
