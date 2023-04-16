@@ -364,17 +364,23 @@ def do_columns(paths, metrics, headers, box1, box2, margin, out_list, max_width)
         out_list.append(r""" \end{minipage}""")
 
     out_list.append(r"\vspace{2mm}\\")
+    # out_list.append(r"""
+    #       \begin{tabular}{ r }
+    #           MSE\\
+    #           PSNR\\
+    #           SSIM\\
+    #           FMean\\
+    #           FWMean\\
+    #           F1WQ\\
+    #           F3WQ\\
+    #           FMIN\\
+    #           FMAX\\
+    #      \end{tabular}""")
     out_list.append(r"""
           \begin{tabular}{ r }
               MSE\\
               PSNR\\
               SSIM\\
-              FMean\\
-              FWMean\\
-              F1WQ\\
-              F3WQ\\
-              FMIN\\
-              FMAX\\
          \end{tabular}""")
 
     for idx, path_pack in enumerate(paths):
@@ -393,17 +399,18 @@ def do_columns(paths, metrics, headers, box1, box2, margin, out_list, max_width)
          \begin{tabular}{ r }
           """, maybe_make_blue(m["MSE"],  best_mse),        r"""\\
           """, maybe_make_blue(m["PSNR"], best_psnr),       r"""\\
-          """, maybe_make_blue(m["SSIM"], best_ssim),       r"""\\
-          """, maybe_make_blue(m["Flip Mean"], best_fmean), r"""\\
-          """, round_sig(m["Flip Weighted median"]),       r"""\\
-          """, round_sig(m["Flip 1st weighted quartile"]), r"""\\
-          """, round_sig(m["Flip 3rd weighted quartile"]), r"""\\
-          """, round_sig(m["Flip Min"]), r"""\\
-          """, round_sig(m["Flip Max"]), r"""\\
+          """, maybe_make_blue(m["SSIM"], best_ssim),      # r"""\\
+          # """,maybe_make_blue(m["Flip Mean"], best_fmean), r"""\\
+          #""", round_sig(m["Flip Weighted median"]),       r"""\\
+          #""", round_sig(m["Flip 1st weighted quartile"]), r"""\\
+          #""", round_sig(m["Flip 3rd weighted quartile"]), r"""\\
+          #""", round_sig(m["Flip Min"]), r"""\\
+          #""", round_sig(m["Flip Max"]),
+                         r"""\\
          \end{tabular}}"""))
 
 
-    out_list.append(r""" & \phantom{FMean}
+    out_list.append(r""" & \multicolumn{1}{r}{\begin{tabular}{ r } \phantom{PSNR}\\\end{tabular}}
         \end{tabular}}
         \egroup
       \end{center}
